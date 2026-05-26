@@ -19,6 +19,8 @@ It is designed to work with windows and steam... however if TPF2 is not download
 
 As of v1.1.0 is writes the `.lua` file for you -any other authors or contributors and it sets up a basic `.con` file for you to edit.
 
+A youtube showcase can be found [here](https://youtu.be/fYWmNHZp3gM).
+
 ## Important notes
 
 - This tool does **not** replace the official Model Editor.
