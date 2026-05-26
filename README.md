@@ -1,7 +1,9 @@
 # Transport Fever 2 Asset Setup Helper
 
 A small Windows helper tool for **Transport Fever 2 asset modding**.
+
 **v1.0.2 wipes model editor settings**
+
 **v1.0.3 does not write tags correctly**
 
 
