@@ -2,9 +2,11 @@
 
 A small Windows helper tool for **Transport Fever 2 asset modding**.
 
-**v1.0.2 wipes model editor settings**
+**v1.1.0 Is latest release and has no known bugs**
 
 **v1.0.3 does not write tags correctly**
+
+**v1.0.2 wipes model editor settings**
 
 
 ## What it does
