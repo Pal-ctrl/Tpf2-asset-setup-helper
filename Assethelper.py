@@ -106,17 +106,31 @@ def build_tf2_mod_environment():
     else:
         print(f"[*] Found Staging Area: {staging_dir}")
 
-    # 2. Initialization Run
-    has_run_before = input("Have you run the Model Editor before? i.e will have generated settings lua file(y/n): ").strip().lower()
-    if has_run_before != 'y':
+    # --- AUTOMATIC APPDATA DETECTION (Moved up to check for settings file existence) ---
+    user_data_dir = os.getenv('APPDATA')
+    if not user_data_dir:
+        user_data_dir = os.path.expanduser(r"~\AppData\Roaming")
+    
+    if not os.path.exists(user_data_dir):
+        print(f"[-] Could not automatically verify AppData path at: {user_data_dir}")
+        user_data_dir = input("Please manually enter the full path to your AppData\\Roaming folder: ").strip().strip('"\'')
+    else:
+        print(f"[*] Auto-detected AppData directory: {user_data_dir}")
+        
+    tf2_appdata_dir = os.path.join(user_data_dir, "Transport Fever 2")
+    settings_file = os.path.join(tf2_appdata_dir, "model_editor_settings.lua")
+
+    # 2. Automated Initialization Check
+    if not os.path.exists(settings_file):
         if os.path.exists(model_editor_bat):
-            print("\n[+] Launching Model Editor to generate initial settings...")
-            # The 'cwd' argument is the secret to fixing this
+            print("\n[+] 'model_editor_settings.lua' not found. Launching Model Editor to generate baseline settings...")
             launch_model_editor(model_editor_bat)
-            input("\n[!] Close the Model Editor window, then press ENTER here to continue...")
+            input("\n[!] Close the Model Editor window once it opens, then press ENTER here to continue...")
         else:
-            print("[-] Error: Cannot launch ModelEditor.bat (Path invalid).")
+            print("[-] Error: Cannot launch ModelEditor.bat to generate settings (Path invalid).")
             return
+    else:
+        print("[*] Found existing 'model_editor_settings.lua'. Skipping baseline run.")
 
     # 3. Request Mod Details
     print("\n--- Mod Metadata ---")
@@ -127,10 +141,9 @@ def build_tf2_mod_environment():
     
     print("\n--- Mod Tags ---")
     print("Common tags: Asset, Script Mod, Locomotive, Building, Station, Misc. Full list: https://wiki.transportfever2.com/doku.php?id=modding:modtags")
-    tags_input = input("Enter tags separated by commas (e.g., Asset, Script Mod): [you can leave this blank, but highly recommended to fill out before publishing] ").strip()
+    tags_input = input("Enter asset tags separated by commas (e.g., Track, Industry): [you can leave this blank, but highly recommended to fill out before publishing] ").strip()
 
     print("\n--- Asset Type Configuration ---")
-    # Mapping numeric choices to the exact engine-required strings
     type_map = {
         "1": "ASSET_DEFAULT", "2": "ASSET_TRACK", "3": "INDUSTRY", 
         "4": "STREET_STATION", "5": "STREET_STATION_CARGO", 
@@ -154,28 +167,13 @@ def build_tf2_mod_environment():
     year_to = input("Enter End Year (0 for unlimited): ").strip() or "0"
     print("\nPlease note: The construction type and availability years will be set in the generated .con file, but you may need to further customize it after generation depending on your asset's needs:https://wiki.transportfever2.com/doku.php?id=modding:constructionbasics")
     
-    # 4 Parse tags and format them into a valid Lua string array format: "Tag1", "Tag2"
-    tags_list = [t.strip() for t in tags_input.split(',')] if tags_input else ["Asset", "Script Generated"]
+    # 4 Parse tags and format them into a valid Lua string array format
+    tags_list = [t.strip() for t in tags_input.split(',')] if tags_input else ["Placeholder1", "Placeholder2"]
     lua_formatted_tags = ", ".join(f'"{tag}"' for tag in tags_list)
 
     # 5. Request Required Paths
     print("\n--- Directories ---")
     fbx_dir = input("Enter FBX Import Path (where your .fbx models are saved): ").strip().strip('"\'')
-    
-    # --- AUTOMATIC APPDATA DETECTION ---
-    user_data_dir = os.getenv('APPDATA')
-    
-    # If APPDATA isn't found, try the expanduser fallback
-    if not user_data_dir:
-        user_data_dir = os.path.expanduser(r"~\AppData\Roaming")
-    
-    # Check if the detected path actually exists on the disk
-    if not os.path.exists(user_data_dir):
-        print(f"[-] Could not automatically verify AppData path at: {user_data_dir}")
-        user_data_dir = input("Please manually enter the full path to your AppData\\Roaming folder: ").strip().strip('"\'')
-    else:
-        print(f"[*] Auto-detected AppData directory: {user_data_dir}")
-    tf2_appdata_dir = os.path.join(user_data_dir, "Transport Fever 2")
 
     # 6. Create the strictly formatted mod folder
     mod_folder_name = f"{mod_name}_1"
@@ -258,29 +256,37 @@ def build_tf2_mod_environment():
         f.write(con_lua_content)
     print(f"[+] Generated construction script at: {con_lua_path}")
 
-    # 9. Edit the Model Editor configuration Lua to automate import paths
-    settings_file = os.path.join(tf2_appdata_dir, "model_editor_settings.lua")
-    
-    # TF2's Lua engine handles paths significantly better when utilizing forward slashes
-    safe_fbx_dir = os.path.dirname(fbx_dir)  
+    # 9. Targeted Lua configuration modification (without clearing existing options)
     safe_fbx_dir = fbx_dir.replace('\\', '/')
     user_data_diractual = os.path.dirname(staging_dir)  
     safe_user_data_dir = user_data_diractual.replace('\\', '/')
     
-    settings_lua_content = textwrap.dedent(f"""\
-        function data()
-        return {{
-            importFbxPath = "{safe_fbx_dir}",
-            userDataPath = "{safe_user_data_dir}",
-        }}
-        end
-    """)
-    
-    os.makedirs(tf2_appdata_dir, exist_ok=True)
-    
-    with open(settings_file, "w") as f:
-        f.write(settings_lua_content)
-    print(f"[+] Overwrote model_editor_settings.lua with your custom paths.")
+    try:
+        with open(settings_file, "r", encoding="utf-8") as f:
+            lua_content = f.read()
+
+        # Target only the path definitions using regex to preserve everything else
+        updated_content = re.sub(r'importFbxPath\s*=\s*["\'].*?["\']', f'importFbxPath = "{safe_fbx_dir}"', lua_content)
+        updated_content = re.sub(r'userDataPath\s*=\s*["\'].*?["\']', f'userDataPath = "{safe_user_data_dir}"', updated_content)
+
+        with open(settings_file, "w", encoding="utf-8") as f:
+            f.write(updated_content)
+        print(f"[+] Successfully injected your custom paths into 'model_editor_settings.lua' without clearing options.")
+        
+    except Exception as e:
+        print(f"[-] Error processing settings file natively: {e}")
+        print("[*] Reverting to creating a default custom settings file...")
+        settings_lua_content = textwrap.dedent(f"""\
+            function data()
+            return {{
+                importFbxPath = "{safe_fbx_dir}",
+                userDataPath = "{safe_user_data_dir}",
+            }}
+            end
+        """)
+        os.makedirs(tf2_appdata_dir, exist_ok=True)
+        with open(settings_file, "w", encoding="utf-8") as f:
+            f.write(settings_lua_content)
 
     # 10. Execute ModelEditor.bat again
     print("\n[+] Re-launching Transport Fever 2 Model Editor with injected parameters...")
