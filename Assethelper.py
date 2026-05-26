@@ -205,31 +205,35 @@ def build_tf2_mod_environment_core(mod_name, mod_tag, mod_desc, tags_list, con_t
     with open(con_lua_path, "w") as f:
         f.write(con_lua_content)
 
-    # 8. Modify Lua Settings (Safely)
+    # 8. Modify Lua Settings (Robustly)
     safe_fbx_dir = fbx_dir.replace('\\', '/')
     user_data_diractual = os.path.dirname(staging_dir)  
     safe_user_data_dir = user_data_diractual.replace('\\', '/')
     
+    # 1. If the file doesn't exist, launch the editor silently to let it generate defaults.
+    if not os.path.exists(settings_file):
+        # We start the process, wait for it to create the file, then kill it.
+        proc = subprocess.Popen([model_editor_bat], cwd=os.path.dirname(model_editor_bat))
+        # Small sleep to give the engine time to create the file
+        import time
+        time.sleep(2) 
+        proc.terminate()
+        
+    # 2. Now that the file is guaranteed to exist (either it was there, or we forced generation),
+    # we can safely perform the regex patch.
     try:
         with open(settings_file, "r", encoding="utf-8") as f:
             lua_content = f.read()
+        
+        # Patch the file
         updated_content = re.sub(r'importFbxPath\s*=\s*["\'].*?["\']', f'importFbxPath = "{safe_fbx_dir}"', lua_content)
         updated_content = re.sub(r'userDataPath\s*=\s*["\'].*?["\']', f'userDataPath = "{safe_user_data_dir}"', updated_content)
+        
         with open(settings_file, "w", encoding="utf-8") as f:
             f.write(updated_content)
-    except Exception:
-        settings_lua_content = textwrap.dedent(f"""\
-            function data()
-            return {{
-                importFbxPath = "{safe_fbx_dir}",
-                userDataPath = "{safe_user_data_dir}",
-            }}
-            end
-        """)
-        os.makedirs(tf2_appdata_dir, exist_ok=True)
-        with open(settings_file, "w", encoding="utf-8") as f:
-            f.write(settings_lua_content)
-
+    except Exception as e:
+        # Fallback if patching fails
+        print(f"Failed to patch settings: {e}")
     # 9. Launch Editor
     launch_model_editor(model_editor_bat)
     return f"Success! Generated '{mod_folder_name}' and injected paths.\nSelect your mod folder in the Editor UI to import."
