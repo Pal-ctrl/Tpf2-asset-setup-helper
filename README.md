@@ -15,7 +15,7 @@ This tool creates the basic mod files for simple asset mods and can set up the `
 
 The aim is to streamline the early setup process before using the official Model Editor, especially the repetitive folder and Lua file setup. (So less digging through folders)
 
-It is designed to work with windows and steam... however if TPF2 is not downloaded throuh steam is will not automatically find the filepaths for you.
+It is designed to work with windows and steam... however if TPF2 is not downloaded through steam it will not automatically find the filepaths for you.
 
 As of v1.1.0 is writes the `.lua` file for you -any other authors or contributors and it sets up a basic `.con` file for you to edit.
 
